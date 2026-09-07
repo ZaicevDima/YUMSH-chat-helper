@@ -18,6 +18,7 @@ public class ChatEntry {
     @GeneratedValue(strategy = GenerationType.UUID)
     UUID id;
 
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)
