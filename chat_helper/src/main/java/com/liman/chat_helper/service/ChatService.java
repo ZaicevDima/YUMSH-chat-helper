@@ -1,5 +1,6 @@
 package com.liman.chat_helper.service;
 
+import com.liman.chat_helper.advisor.PostgresChatMemory;
 import com.liman.chat_helper.model.Chat;
 import com.liman.chat_helper.model.ChatEntry;
 import com.liman.chat_helper.model.Role;
@@ -8,7 +9,6 @@ import lombok.SneakyThrows;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,13 +28,17 @@ public class ChatService {
 
     private final ChatRepository chatRepository;
     private final ChatClient chatClient;
+    private final PostgresChatMemory postgresChatMemory;
 
     @Autowired
     private ChatService myProxy;
 
-    public ChatService(ChatRepository chatRepository, ChatClient chatClient) {
+    public ChatService(ChatRepository chatRepository,
+                       ChatClient chatClient,
+                       PostgresChatMemory postgresChatMemory) {
         this.chatRepository = chatRepository;
         this.chatClient = chatClient;
+        this.postgresChatMemory = postgresChatMemory;
     }
 
 
@@ -79,8 +83,6 @@ public class ChatService {
     }
 
     public SseEmitter proceedInteractionWithStreaming(UUID chatId, String prompt) {
-        myProxy.addChatEntry(chatId, prompt, USER);
-
         StringBuilder answer = new StringBuilder();
 
         SseEmitter sseEmitter = new SseEmitter(0L);
@@ -90,15 +92,13 @@ public class ChatService {
                 .stream()
                 .chatResponse()
                 .subscribe(chatResponse -> processToken(chatResponse, sseEmitter, answer),
-                        sseEmitter::completeWithError,
-                        () -> myProxy.addChatEntry(chatId, answer.toString(), ASSISTANT));
+                        sseEmitter::completeWithError);
 
         return sseEmitter;
     }
 
     private AbstractChatMemoryAdvisor getMemoryAdvisor(UUID chatId) {
-        InMemoryChatMemory chatMemory = new InMemoryChatMemory();
-        return MessageChatMemoryAdvisor.builder(chatMemory)
+        return MessageChatMemoryAdvisor.builder(postgresChatMemory)
                 .conversationId(chatId.toString())
                 .build();
     }
