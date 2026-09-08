@@ -6,6 +6,9 @@ import com.liman.chat_helper.model.Role;
 import com.liman.chat_helper.repository.ChatRepository;
 import lombok.SneakyThrows;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.InMemoryChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,6 +86,7 @@ public class ChatService {
         SseEmitter sseEmitter = new SseEmitter(0L);
         chatClient.prompt()
                 .user(prompt)
+                .advisors(getMemoryAdvisor(chatId))
                 .stream()
                 .chatResponse()
                 .subscribe(chatResponse -> processToken(chatResponse, sseEmitter, answer),
@@ -92,11 +96,17 @@ public class ChatService {
         return sseEmitter;
     }
 
+    private AbstractChatMemoryAdvisor getMemoryAdvisor(UUID chatId) {
+        InMemoryChatMemory chatMemory = new InMemoryChatMemory();
+        return MessageChatMemoryAdvisor.builder(chatMemory)
+                .conversationId(chatId.toString())
+                .build();
+    }
+
     @SneakyThrows
-    private static void processToken(ChatResponse chatResponse, SseEmitter sseEmitter, StringBuilder answer) {
+    private void processToken(ChatResponse chatResponse, SseEmitter sseEmitter, StringBuilder answer) {
         AssistantMessage token = chatResponse.getResult().getOutput();
         sseEmitter.send(token);
         answer.append(token.getText());
-
     }
 }
