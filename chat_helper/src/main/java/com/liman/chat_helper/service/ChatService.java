@@ -1,14 +1,12 @@
 package com.liman.chat_helper.service;
 
-import com.liman.chat_helper.advisor.PostgresChatMemory;
 import com.liman.chat_helper.model.Chat;
 import com.liman.chat_helper.model.ChatEntry;
 import com.liman.chat_helper.model.Role;
 import com.liman.chat_helper.repository.ChatRepository;
 import lombok.SneakyThrows;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,17 +26,15 @@ public class ChatService {
 
     private final ChatRepository chatRepository;
     private final ChatClient chatClient;
-    private final PostgresChatMemory postgresChatMemory;
 
     @Autowired
     private ChatService myProxy;
 
     public ChatService(ChatRepository chatRepository,
-                       ChatClient chatClient,
-                       PostgresChatMemory postgresChatMemory) {
+                       ChatClient chatClient) {
         this.chatRepository = chatRepository;
         this.chatClient = chatClient;
-        this.postgresChatMemory = postgresChatMemory;
+//        this.postgresChatMemory = postgresChatMemory;
     }
 
 
@@ -88,19 +84,13 @@ public class ChatService {
         SseEmitter sseEmitter = new SseEmitter(0L);
         chatClient.prompt()
                 .user(prompt)
-                .advisors(getMemoryAdvisor(chatId))
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, chatId))
                 .stream()
                 .chatResponse()
                 .subscribe(chatResponse -> processToken(chatResponse, sseEmitter, answer),
                         sseEmitter::completeWithError);
 
         return sseEmitter;
-    }
-
-    private AbstractChatMemoryAdvisor getMemoryAdvisor(UUID chatId) {
-        return MessageChatMemoryAdvisor.builder(postgresChatMemory)
-                .conversationId(chatId.toString())
-                .build();
     }
 
     @SneakyThrows
