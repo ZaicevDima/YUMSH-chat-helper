@@ -6,7 +6,6 @@ import com.liman.chat_helper.repository.ChatRepository;
 import lombok.Builder;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Comparator;
 import java.util.List;
