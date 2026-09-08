@@ -3,42 +3,43 @@ package com.liman.chat_helper.advisor;
 import com.liman.chat_helper.model.Chat;
 import com.liman.chat_helper.model.ChatEntry;
 import com.liman.chat_helper.repository.ChatRepository;
+import lombok.Builder;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
-@Component
+@Builder
 public class PostgresChatMemory implements ChatMemory {
 
-    private final ChatRepository chatRepository;
+    private ChatRepository chatMemoryRepository;
 
-    public PostgresChatMemory(ChatRepository chatRepository) {
-        this.chatRepository = chatRepository;
-    }
+    private int maxMessages;
 
     @Override
-    @Transactional
     public void add(String conversationId, List<Message> messages) {
+        UUID chatId = UUID.fromString(conversationId);
+        Chat chat = chatMemoryRepository.findById(chatId).orElseThrow();
+
         for (Message message : messages) {
-            UUID chatId = UUID.fromString(conversationId);
-            Chat chat = chatRepository.findById(chatId).orElseThrow();
             ChatEntry chatEntry = ChatEntry.toChatEntry(message);
             chat.addEntry(chatEntry);
         }
+
+        chatMemoryRepository.save(chat);
     }
 
     @Override
-    public List<Message> get(String conversationId, int lastN) {
+    public List<Message> get(String conversationId) {
         UUID chatId = UUID.fromString(conversationId);
-        Chat chat = chatRepository.findById(chatId).orElseThrow();
+        Chat chat = chatMemoryRepository.findById(chatId).orElseThrow();
 
         return chat.getHistory().stream()
+                .sorted(Comparator.comparing(ChatEntry::getCreatedAt).reversed())
                 .map(ChatEntry::toMessage)
-                .limit(lastN)
+                .limit(maxMessages)
                 .toList();
     }
 
